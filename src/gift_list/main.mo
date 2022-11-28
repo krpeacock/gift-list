@@ -70,8 +70,7 @@ actor GiftList {
   public shared ({caller}) func updateGift (id: Text, status: Status) : async Result.Result<(), Text> {
 
     let buf = Buffer.Buffer<Gift>( controllers.size());
-    for(i in Iter.range(0, controllers.size())) {
-      let gift = items[i];
+    for(gift in Array.vals(items)) {
       if(gift.id == id){
         if(gift.status == #bought and status == #bought){
             return #err("Already bought");
