@@ -7,3 +7,5 @@ dfx canister call gift_list registerGift color-lights --network ic
 dfx canister call gift_list registerGift white-lights --network ic
 dfx canister call gift_list registerGift motion-lights --network ic
 dfx canister call gift_list registerGift bell --network ic
+dfx canister call gift_list registerGift controller --network ic
+dfx canister call gift_list registerGift spider-man --network ic
