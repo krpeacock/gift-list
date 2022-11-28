@@ -3,28 +3,14 @@
     "gift_list": {
       "main": "src/gift_list/main.mo",
       "type": "motoko"
-    },
-    "gift_list_assets": {
-      "dependencies": [
-        "gift_list"
-      ],
-      "frontend": {
-        "entrypoint": "src/gift_list_assets/src/index.html"
-      },
-      "source": [
-        "src/gift_list_assets/assets",
-        "dist/gift_list_assets/"
-      ],
-      "type": "assets"
     }
   },
   "defaults": {
     "build": {
       "args": "",
-      "packtool": ""
+      "packtool": "vessel sources"
     }
   },
-  "dfx": "0.9.3",
   "networks": {
     "local": {
       "bind": "127.0.0.1:8000",
