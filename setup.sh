@@ -1,8 +1,9 @@
-dfx canister call gift_list registerGift coat
-dfx canister call gift_list registerGift sweater
-dfx canister call gift_list registerGift joggers
-dfx canister call gift_list registerGift wallet
-dfx canister call gift_list registerGift color-lights
-dfx canister call gift_list registerGift white-lights
-dfx canister call gift_list registerGift motion-lights
-dfx canister call gift_list registerGift bell
+dfx canister call gift_list getControllers --network ic
+dfx canister call gift_list registerGift coat --network ic
+dfx canister call gift_list registerGift sweater --network ic
+dfx canister call gift_list registerGift joggers --network ic
+dfx canister call gift_list registerGift wallet --network ic
+dfx canister call gift_list registerGift color-lights --network ic
+dfx canister call gift_list registerGift white-lights --network ic
+dfx canister call gift_list registerGift motion-lights --network ic
+dfx canister call gift_list registerGift bell --network ic
