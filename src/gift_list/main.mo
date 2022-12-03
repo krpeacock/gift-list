@@ -9,73 +9,75 @@ import Debug "mo:base/Debug";
 import IC "mo:management-canister";
 
 actor GiftList {
-  
+
   type Status = {
     #bought;
     #unbought;
   };
   type Gift = {
     id : Text;
-    status: Status;
-    modifiedBy : ?Principal
+    status : Status;
+    modifiedBy : ?Principal;
   };
-  
-  stable var items: [Gift] = [];
-  stable var controllers: [Principal] = []; 
 
-  public shared ({caller}) func registerGift (id: Text) : async () {
-    let buf= Buffer.Buffer<Gift>( items.size() + 1);
-    if(isController(caller)){
-      let duplicate = Array.find<Gift>(items, func (x){ return x.id == id});
-      if(Option.isSome(duplicate)){
+  stable var items : [Gift] = [];
+  stable var controllers : [Principal] = [];
+
+  public shared ({ caller }) func registerGift(id : Text) : async () {
+    let buf = Buffer.Buffer<Gift>(items.size() + 1);
+    if (isController(caller)) {
+      let duplicate = Array.find<Gift>(items, func(x) { return x.id == id });
+      if (Option.isSome(duplicate)) {
         throw Error.reject("Error: duplicate gift. Use a new ID");
       };
 
-      if(items.size() > 0){
-      for(i in items.vals()) {
-        Debug.print(debug_show i);
-            buf.add(i);
+      if (items.size() > 0) {
+        for (i in items.vals()) {
+          Debug.print(debug_show i);
+          buf.add(i);
         };
       };
       buf.add({
         id;
-        status=#unbought;
-        modifiedBy=null;
+        status = #unbought;
+        modifiedBy = null;
       });
       items := buf.toArray();
       return ();
     } else {
-    throw Error.reject("not a controller");
-    }
+      throw Error.reject("not a controller");
+    };
   };
 
-
-  private func isController (caller: Principal) :Bool {
-    let foundController = Array.find<Principal>(controllers, func (x: Principal) : Bool {
-      return Principal.equal(x, caller);
-    });
-    Debug.print("Caller is a controller:" # debug_show Option.isSome(foundController)); 
-     return Option.isSome(foundController);
+  private func isController(caller : Principal) : Bool {
+    let foundController = Array.find<Principal>(
+      controllers,
+      func(x : Principal) : Bool {
+        return Principal.equal(x, caller);
+      },
+    );
+    Debug.print("Caller is a controller:" # debug_show Option.isSome(foundController));
+    return Option.isSome(foundController);
   };
 
-  public query func getGifts () : async [Gift] {
+  public query func getGifts() : async [Gift] {
     Debug.print("Gifts" # debug_show items[0]);
     return items;
   };
 
-  public query func getGift (id: Text) : async ?Gift {
-    Array.find<Gift>(items, func(x:Gift){ return x.id == id })
+  public query func getGift(id : Text) : async ?Gift {
+    Array.find<Gift>(items, func(x : Gift) { return x.id == id });
   };
 
-  public shared ({caller}) func updateGift (id: Text, status: Status) : async Result.Result<(), Text> {
+  public shared ({ caller }) func updateGift(id : Text, status : Status) : async Result.Result<(), Text> {
 
-    let buf = Buffer.Buffer<Gift>( controllers.size());
-    for(gift in Array.vals(items)) {
-      if(gift.id == id){
-        if(gift.status == #bought and status == #bought){
-            return #err("Already bought");
+    let buf = Buffer.Buffer<Gift>(controllers.size());
+    for (gift in Array.vals(items)) {
+      if (gift.id == id) {
+        if (gift.status == #bought and status == #bought) {
+          return #err("Already bought");
         };
-        if(gift.status == #unbought and status == #unbought){
+        if (gift.status == #unbought and status == #unbought) {
           return #err("Already unbought");
         };
         buf.add({
@@ -88,7 +90,7 @@ actor GiftList {
       };
     };
     items := buf.toArray();
-   
+
     #ok(());
   };
 
