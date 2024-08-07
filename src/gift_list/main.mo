@@ -23,9 +23,8 @@ actor GiftList {
   stable var items : [Gift] = [];
   stable var controllers : [Principal] = [];
 
-  public shared ({ caller }) func registerGift(id : Text) : async () {
+  public func registerGift(id : Text) : async () {
     let buf = Buffer.Buffer<Gift>(items.size() + 1);
-    if (isController(caller)) {
       let duplicate = Array.find<Gift>(items, func(x) { return x.id == id });
       if (Option.isSome(duplicate)) {
         throw Error.reject("Error: duplicate gift. Use a new ID");
@@ -44,20 +43,6 @@ actor GiftList {
       });
       items := buf.toArray();
       return ();
-    } else {
-      throw Error.reject("not a controller");
-    };
-  };
-
-  private func isController(caller : Principal) : Bool {
-    let foundController = Array.find<Principal>(
-      controllers,
-      func(x : Principal) : Bool {
-        return Principal.equal(x, caller);
-      },
-    );
-    Debug.print("Caller is a controller:" # debug_show Option.isSome(foundController));
-    return Option.isSome(foundController);
   };
 
   public query func getGifts() : async [Gift] {
