@@ -1,14 +1,20 @@
-import Principal "mo:base/Principal";
-import Array "mo:base/Array";
 import Error "mo:base/Error";
 import Option "mo:base/Option";
 import Buffer "mo:base/Buffer";
 import Result "mo:base/Result";
-import Iter "mo:base/Iter";
 import Debug "mo:base/Debug";
-import IC "mo:management-canister";
+import Array "mo:base/Array";
+import Time "mo:base/Time";
+import Int "mo:base/Int";
+import Iter "mo:base/Iter";
+import Server "mo:server";
 
 actor GiftList {
+  type Request = Server.Request;
+  type Response = Server.Response;
+  type ResponseClass = Server.ResponseClass;
+  stable var serializedEntries : Server.SerializedEntries = ([], [], []);
+  var server = Server.Server({ serializedEntries });
 
   type Status = {
     #bought;
@@ -25,24 +31,25 @@ actor GiftList {
 
   public func registerGift(id : Text) : async () {
     let buf = Buffer.Buffer<Gift>(items.size() + 1);
-      let duplicate = Array.find<Gift>(items, func(x) { return x.id == id });
-      if (Option.isSome(duplicate)) {
-        throw Error.reject("Error: duplicate gift. Use a new ID");
-      };
+    let duplicate = Array.find<Gift>(items, func(x) { return x.id == id });
+    if (Option.isSome(duplicate)) {
+      throw Error.reject("Error: duplicate gift. Use a new ID");
+    };
 
-      if (items.size() > 0) {
-        for (i in items.vals()) {
-          Debug.print(debug_show i);
-          buf.add(i);
-        };
+    if (items.size() > 0) {
+      for (i in items.vals()) {
+        Debug.print(debug_show i);
+        buf.add(i);
       };
-      buf.add({
-        id;
-        status = #unbought;
-        modifiedBy = null;
-      });
-      items := buf.toArray();
-      return ();
+    };
+    buf.add({
+      id;
+      status = #unbought;
+      modifiedBy = null;
+    });
+    items := Buffer.toArray(buf);
+    let _ = server.cache.pruneAll();
+    return ();
   };
 
   public query func getGifts() : async [Gift] {
@@ -54,7 +61,7 @@ actor GiftList {
     Array.find<Gift>(items, func(x : Gift) { return x.id == id });
   };
 
-  public shared ({ caller }) func updateGift(id : Text, status : Status) : async Result.Result<(), Text> {
+  public func updateGift(id : Text, status : Status) : async Result.Result<(), Text> {
 
     let buf = Buffer.Buffer<Gift>(controllers.size());
     for (gift in Array.vals(items)) {
@@ -68,27 +75,104 @@ actor GiftList {
         buf.add({
           id = id;
           status = status;
-          modifiedBy = ?caller;
+          // ignore modifiedBy
+          modifiedBy = null;
         });
       } else {
         buf.add(gift);
       };
     };
-    items := buf.toArray();
-
+    items := Buffer.toArray(buf);
+    let _ = server.cache.pruneAll();
     #ok(());
   };
 
-  public func getControllers() : async [Principal] {
-    let management : IC.Self = actor ("aaaaa-aa");
-    let status = await management.canister_status({
-      canister_id = Principal.fromActor(GiftList);
-    });
-    controllers := status.settings.controllers;
-    return controllers;
+  func jsonGifts() : Text {
+    var result = "[";
+    var count = 0;
+    for (item in Iter.fromArray(items)) {
+      count := count + 1;
+      result := result # formatGift(item);
+      // add a comma if not the last item
+      if (count < items.size()) {
+        result := result # ",";
+      };
+    };
+    result := result # "]";
+    result;
   };
 
-  public func greet(name : Text) : async Text {
-    return "Hello, " # name # "!";
+  func formatGift(gift : Gift) : Text {
+    return "{\"id\":\""
+    # gift.id
+    # "\",\"status\":\""
+    # (if (gift.status == #bought) { "bought" } else { "unbought" })
+    # "\"}";
+  };
+
+  server.get(
+    "/gifts",
+    func(req : Request, res : ResponseClass) : async Response {
+      let gifts = jsonGifts();
+      Debug.print("Gifts" # debug_show gifts);
+
+      Debug.print("path" # debug_show req.url.path);
+
+      let expiry = { nanoseconds = Int.abs(Time.now() + 100) };
+      res.json({
+        status_code = 200;
+        body = gifts;
+        cache_strategy = #expireAfter expiry;
+      });
+    },
+  );
+
+  server.get(
+    "/gifts/:id",
+    func(req : Request, res : ResponseClass) : async Response {
+      ignore do ? {
+
+        let id = req.params!.get("id")!;
+        let gift = (await getGift(id))!;
+        let expiry = { nanoseconds = Int.abs(Time.now() + 100) };
+        return res.json({
+          status_code = 200;
+          body = formatGift(gift);
+          cache_strategy = #expireAfter expiry;
+        });
+      };
+      res.json({
+        status_code = 404;
+        body = "Gift not found";
+        cache_strategy = #noCache;
+      });
+    },
+  );
+
+  /*
+     * http request hooks
+     */
+  public query func http_request(req : Server.HttpRequest) : async Server.HttpResponse {
+    server.http_request(req);
+  };
+  public func http_request_update(req : Server.HttpRequest) : async Server.HttpResponse {
+    await server.http_request_update(req);
+  };
+
+  /*
+     * upgrade hooks
+     */
+  system func preupgrade() {
+    serializedEntries := server.entries();
+  };
+
+  system func postupgrade() {
+    ignore server.cache.pruneAll();
+  };
+
+  public func empty_cache() : async () {
+    for (key in server.cache.keys()) {
+      server.cache.delete(key);
+    };
   };
 };
