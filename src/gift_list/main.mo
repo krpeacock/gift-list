@@ -62,15 +62,19 @@ actor GiftList {
   };
 
   public func updateGift(id : Text, status : Status) : async Result.Result<(), Text> {
+    update_gift(id, status);
+  };
 
+  private func update_gift(id : Text, status : Status) : Result.Result<(), Text> {
+    ignore server.cache.pruneAll();
     let buf = Buffer.Buffer<Gift>(controllers.size());
     for (gift in Array.vals(items)) {
       if (gift.id == id) {
         if (gift.status == #bought and status == #bought) {
-          return #err("Already bought");
+          return #ok ();
         };
         if (gift.status == #unbought and status == #unbought) {
-          return #err("Already unbought");
+          return #ok ();
         };
         buf.add({
           id = id;
@@ -83,7 +87,6 @@ actor GiftList {
       };
     };
     items := Buffer.toArray(buf);
-    let _ = server.cache.pruneAll();
     #ok(());
   };
 
@@ -140,6 +143,42 @@ actor GiftList {
           body = formatGift(gift);
           cache_strategy = #expireAfter expiry;
         });
+      };
+      res.json({
+        status_code = 404;
+        body = "Gift not found";
+        cache_strategy = #default;
+      });
+    },
+  );
+
+  server.post(
+    "/gifts/:id/toggle",
+    func(req : Request, res : ResponseClass) : async Response {
+      ignore do ? {
+        let id = req.params!.get("id")!;
+        let status = req.body!.text();
+        let gift = (await getGift(id))!;
+        // toggle status
+        let newStatus = if (gift.status == #bought) { #unbought } else { #bought };
+        let result = await updateGift(id, newStatus);
+        let newGift = (await getGift(id))!;
+        switch (result) {
+          case (#ok _) {
+            return res.json({
+              status_code = 200;
+              body = formatGift(newGift);
+              cache_strategy = #noCache;
+            });
+          };
+          case (#err msg) {
+            return res.json({
+              status_code = 400;
+              body = msg;
+              cache_strategy = #noCache;
+            });
+          };
+        };
       };
       res.json({
         status_code = 404;
